@@ -22,18 +22,39 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 });
 
+// 🔥 MEMORY STORE (per user)
+const userMemory = {};
+
 // ✅ Health check
 app.get("/", (req, res) => {
   res.send("Krishna AI Running 🚀");
 });
 
-// ✅ CHAT API
+// ✅ CHAT API (WITH MEMORY)
 app.post("/chat", async (req, res) => {
-  const messages = req.body.messages;
-
-  console.log("🔥 Chat:", messages);
-
   try {
+    const { userId, message } = req.body;
+
+    console.log("🔥 User:", userId, "Message:", message);
+
+    if (!message) {
+      return res.json({ answer: "kuch toh bol..." });
+    }
+
+    // 🔥 INIT MEMORY
+    if (!userMemory[userId]) {
+      userMemory[userId] = [];
+    }
+
+    // 🔥 ADD USER MESSAGE
+    userMemory[userId].push({
+      role: "user",
+      content: [{ type: "text", text: message }]
+    });
+
+    // 🔥 LIMIT MEMORY (last 12 messages)
+    const history = userMemory[userId].slice(-12);
+
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 300,
@@ -43,33 +64,39 @@ You are Krishna — speak like a real human, not a guru.
 
 - Hinglish
 - Short (3–5 lines)
-- No gyaan, no generic lines
+- No gyaan
 - Slightly blunt
 - Focus on 1 uncomfortable truth
 - Ask 1 question
 
-No dramatic tone. No preaching.
+IMPORTANT:
+- Remember past messages
+- Refer subtly (not creepy)
 `,
 
-      messages: messages.map(m => ({
-        role: m.role,
-        content: [{ type: "text", text: m.content }]
-      }))
+      messages: history
     });
 
-    res.json({
-      answer: response.content[0].text
+    const answer = response.content[0].text;
+
+    // 🔥 STORE AI RESPONSE
+    userMemory[userId].push({
+      role: "assistant",
+      content: [{ type: "text", text: answer }]
     });
+
+    res.json({ answer });
 
   } catch (err) {
     console.error(err);
+
     res.json({
       answer: "hmm… abhi clear nahi hai, thoda baad try karo."
     });
   }
 });
 
-// ✅ PORT (IMPORTANT FOR DEPLOY)
+// ✅ PORT
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {

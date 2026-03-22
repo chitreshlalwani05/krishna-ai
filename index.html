@@ -2,137 +2,220 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Krishna AI</title>
 
-<title>Krishna Chat</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 
 <style>
 body {
-  font-family: Arial;
-  background: linear-gradient(#020617, #0f172a);
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont;
+  background: radial-gradient(circle at top, #1e293b, #020617);
   color: white;
+}
+
+/* TOP BAR */
+.topbar {
   display: flex;
-  justify-content: center;
-  padding: 20px;
+  justify-content: space-between;
+  padding: 12px 16px;
+  font-size: 12px;
+  color: #94a3b8;
 }
 
-.container {
-  width: 100%;
-  max-width: 500px;
-}
-
-h2 {
+/* HERO */
+.hero {
   text-align: center;
+  margin-top: 15vh;
 }
 
+/* CHAT */
 .chat {
-  height: 400px;
+  max-width: 500px;
+  margin: auto;
+  padding: 10px;
+  padding-bottom: 100px;
+  display: none;
+  height: 70vh;
   overflow-y: auto;
-  background: #1e293b;
-  padding: 15px;
-  border-radius: 10px;
-  margin-bottom: 10px;
 }
 
+/* MESSAGE */
 .msg {
-  margin: 10px 0;
-  line-height: 1.5;
-  white-space: pre-wrap;
+  max-width: 75%;
+  padding: 12px;
+  border-radius: 14px;
+  margin: 8px 0;
 }
 
 .user {
-  text-align: right;
-  color: #38bdf8;
+  background: #2563eb;
+  margin-left: auto;
 }
 
 .bot {
-  text-align: left;
-  color: #e2e8f0;
+  background: rgba(255,255,255,0.08);
 }
 
+/* INPUT */
 .input-box {
+  position: fixed;
+  bottom: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 92%;
+  max-width: 500px;
   display: flex;
-  gap: 5px;
+  gap: 10px;
 }
 
 input {
   flex: 1;
-  padding: 10px;
-  border-radius: 8px;
+  padding: 14px;
+  border-radius: 25px;
   border: none;
-  font-size: 16px;
+  background: #1e293b;
+  color: white;
 }
 
 button {
-  padding: 10px;
-  background: orange;
+  padding: 14px;
+  border-radius: 25px;
   border: none;
-  border-radius: 8px;
-  cursor: pointer;
+  background: #f59e0b;
 }
 
-.loading {
-  font-size: 12px;
-  color: #94a3b8;
+/* 🔥 LOGIN WALL FIXED */
+.login-wall {
+  max-width: 500px;
+  margin: 20px auto;
+  text-align: center;
+  display: none;
+}
+
+.login-wall button {
+  width: 80%;
+  border-radius: 25px;
+  font-size: 16px;
+}
+
+/* HIDE INPUT WHEN LOCKED */
+.hidden {
+  display: none !important;
 }
 </style>
 </head>
 
 <body>
 
-<div class="container">
+<div class="topbar">
+  <div id="userInfo">Not logged in</div>
+  <div onclick="logout()" id="logoutBtn" style="display:none;cursor:pointer;">Logout</div>
+</div>
 
-  <h2>🕉 Krishna Chat</h2>
+<div id="hero" class="hero">
+  <h2>Kuch toh chal raha hai tumhare andar…</h2>
+</div>
 
-  <div id="chat" class="chat"></div>
+<div id="chat" class="chat"></div>
 
-  <div class="loading" id="loading"></div>
+<!-- 🔥 LOGIN ABOVE INPUT -->
+<div id="loginWall" class="login-wall">
+  <p>yeh sirf shuruaat hai…</p>
+  <button onclick="login()">Login toh karo aap ! →</button>
+</div>
 
-  <div class="input-box">
-    <input id="input" placeholder="Apni baat likho..." />
-    <button onclick="send()">Send</button>
-  </div>
-
+<!-- 🔥 INPUT -->
+<div class="input-box" id="inputBox">
+  <input id="input" placeholder="Jo bhi mann mein hai likho..." />
+  <button onclick="send()">→</button>
 </div>
 
 <script>
-let messages = [];
 
+const firebaseConfig = {
+  apiKey: "AIzaSyDAr4d1GGJ3bVOTEY_VyTAeXGPCRYL8cyA",
+  authDomain: "krishna-ai-de684.firebaseapp.com",
+  projectId: "krishna-ai-de684"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+
+let hasShownLoginGate = false;
+let isLocked = false;
+
+// AUTH
+auth.onAuthStateChanged(user => {
+  document.getElementById("userInfo").innerText = user ? user.email : "Not logged in";
+  document.getElementById("logoutBtn").style.display = user ? "block" : "none";
+
+  if (user) {
+    document.getElementById("loginWall").style.display = "none";
+    document.getElementById("inputBox").classList.remove("hidden");
+    isLocked = false;
+  }
+});
+
+// LOGIN
+function login() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider);
+}
+
+// LOGOUT
+function logout() {
+  auth.signOut();
+  location.reload();
+}
+
+// SEND
 async function send() {
-  const input = document.getElementById("input");
-  const text = input.value;
 
+  if (isLocked && !auth.currentUser) return;
+
+  const input = document.getElementById("input");
+  const text = input.value.trim();
   if (!text) return;
 
+  document.getElementById("hero").style.display = "none";
+  document.getElementById("chat").style.display = "block";
+
   addMessage("user", text);
-
-  messages.push({ role: "user", content: text });
-
   input.value = "";
 
-  document.getElementById("loading").innerText = "Krishna sun rahe hain...";
+  addTyping();
 
-  try {
-    const res = await fetch("http://localhost:3000/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ messages })
-    });
+  const res = await fetch("https://krishna-ai-w8we.onrender.com/chat", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ messages: [{ role: "user", content: text }] })
+  });
 
-    const data = await res.json();
+  const data = await res.json();
 
+  removeTyping();
+
+  if (!auth.currentUser && !hasShownLoginGate) {
+
+    const partial = data.answer.split("\n").slice(0,2).join("\n");
+
+    addMessage("bot", partial);
+
+    hasShownLoginGate = true;
+    isLocked = true;
+
+    // 🔥 SHOW LOGIN + HIDE INPUT
+    document.getElementById("loginWall").style.display = "block";
+    document.getElementById("inputBox").classList.add("hidden");
+
+  } else {
     addMessage("bot", data.answer);
-
-    messages.push({ role: "assistant", content: data.answer });
-
-    document.getElementById("loading").innerText = "";
-
-  } catch (err) {
-    document.getElementById("loading").innerText = "Error aaya...";
   }
 }
 
+// UI
 function addMessage(role, text) {
   const chat = document.getElementById("chat");
 
@@ -141,8 +224,31 @@ function addMessage(role, text) {
   div.innerText = text;
 
   chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+
+  setTimeout(() => {
+    chat.scrollTo({
+      top: chat.scrollHeight,
+      behavior: "smooth"
+    });
+  }, 50);
 }
+
+function addTyping() {
+  const chat = document.getElementById("chat");
+
+  const div = document.createElement("div");
+  div.id = "typing";
+  div.className = "msg bot";
+  div.innerText = "Krishna soch rahe hain...";
+
+  chat.appendChild(div);
+}
+
+function removeTyping() {
+  const t = document.getElementById("typing");
+  if (t) t.remove();
+}
+
 </script>
 
 </body>
