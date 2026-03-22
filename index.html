@@ -2,7 +2,6 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Krishna AI</title>
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -10,99 +9,62 @@
 <style>
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont;
-  background: radial-gradient(circle at top, #1e293b, #020617);
+  font-family: sans-serif;
+  background: #020617;
   color: white;
 }
 
-/* TOP BAR */
+/* TOP */
 .topbar {
   display: flex;
   justify-content: space-between;
-  padding: 12px 16px;
-  font-size: 12px;
-  color: #94a3b8;
+  padding: 10px;
 }
 
-/* HERO */
-.hero {
-  text-align: center;
-  margin-top: 15vh;
+/* SIDENAV */
+.sidenav {
+  position: fixed;
+  left: -260px;
+  top: 0;
+  width: 260px;
+  height: 100%;
+  background: #111827;
+  padding: 10px;
+  transition: 0.3s;
+}
+
+.sidenav.open {
+  left: 0;
+}
+
+.chat-item {
+  padding: 10px;
+  border-bottom: 1px solid #1f2937;
+  cursor: pointer;
 }
 
 /* CHAT */
 .chat {
-  max-width: 500px;
-  margin: auto;
   padding: 10px;
-  padding-bottom: 100px;
-  display: none;
   height: 70vh;
   overflow-y: auto;
-}
-
-/* MESSAGE */
-.msg {
-  max-width: 75%;
-  padding: 12px;
-  border-radius: 14px;
-  margin: 8px 0;
-}
-
-.user {
-  background: #2563eb;
-  margin-left: auto;
-}
-
-.bot {
-  background: rgba(255,255,255,0.08);
 }
 
 /* INPUT */
 .input-box {
   position: fixed;
-  bottom: 15px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 92%;
-  max-width: 500px;
+  bottom: 0;
+  width: 100%;
   display: flex;
-  gap: 10px;
 }
 
 input {
   flex: 1;
-  padding: 14px;
-  border-radius: 25px;
-  border: none;
-  background: #1e293b;
-  color: white;
+  padding: 10px;
 }
 
 button {
-  padding: 14px;
-  border-radius: 25px;
-  border: none;
-  background: #f59e0b;
-}
-
-/* 🔥 LOGIN WALL FIXED */
-.login-wall {
-  max-width: 500px;
-  margin: 20px auto;
-  text-align: center;
-  display: none;
-}
-
-.login-wall button {
-  width: 80%;
-  border-radius: 25px;
-  font-size: 16px;
-}
-
-/* HIDE INPUT WHEN LOCKED */
-.hidden {
-  display: none !important;
+  padding: 10px;
 }
 </style>
 </head>
@@ -110,32 +72,25 @@ button {
 <body>
 
 <div class="topbar">
+  <div onclick="toggleMenu()">☰</div>
   <div id="userInfo">Not logged in</div>
-  <div onclick="logout()" id="logoutBtn" style="display:none;cursor:pointer;">Logout</div>
 </div>
 
-<div id="hero" class="hero">
-  <h2>Kuch toh chal raha hai tumhare andar…</h2>
-</div>
+<div id="sidenav" class="sidenav"></div>
 
 <div id="chat" class="chat"></div>
 
-<!-- 🔥 LOGIN ABOVE INPUT -->
-<div id="loginWall" class="login-wall">
-  <p>yeh sirf shuruaat hai…</p>
-  <button onclick="login()">Login toh karo aap ! →</button>
-</div>
-
-<!-- 🔥 INPUT -->
-<div class="input-box" id="inputBox">
-  <input id="input" placeholder="Jo bhi mann mein hai likho..." />
-  <button onclick="send()">→</button>
+<div class="input-box">
+  <input id="input" placeholder="Type..." />
+  <button onclick="send()">Send</button>
 </div>
 
 <script>
 
+const BASE = "https://krishna-ai-w8we.onrender.com";
+
 const firebaseConfig = {
-  apiKey: "AIzaSyDAr4d1GGJ3bVOTEY_VyTAeXGPCRYL8cyA",
+  apiKey: "AIzaSyD...",
   authDomain: "krishna-ai-de684.firebaseapp.com",
   projectId: "krishna-ai-de684"
 };
@@ -143,110 +98,102 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 
-let hasShownLoginGate = false;
-let isLocked = false;
+let currentChatId = null;
 
 // AUTH
 auth.onAuthStateChanged(user => {
   document.getElementById("userInfo").innerText = user ? user.email : "Not logged in";
-  document.getElementById("logoutBtn").style.display = user ? "block" : "none";
-
-  if (user) {
-    document.getElementById("loginWall").style.display = "none";
-    document.getElementById("inputBox").classList.remove("hidden");
-    isLocked = false;
-  }
+  if (user) loadChats();
 });
 
-// LOGIN
-function login() {
-  const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider);
+// MENU
+function toggleMenu() {
+  document.getElementById("sidenav").classList.toggle("open");
 }
 
-// LOGOUT
-function logout() {
-  auth.signOut();
-  location.reload();
-}
+// LOAD CHAT LIST
+async function loadChats() {
+  const user = auth.currentUser;
 
-// SEND
-async function send() {
-
-  if (isLocked && !auth.currentUser) return;
-
-  const input = document.getElementById("input");
-  const text = input.value.trim();
-  if (!text) return;
-
-  document.getElementById("hero").style.display = "none";
-  document.getElementById("chat").style.display = "block";
-
-  addMessage("user", text);
-  input.value = "";
-
-  addTyping();
-
-  const res = await fetch("https://krishna-ai-w8we.onrender.com/chat", {
+  const res = await fetch(BASE + "/chats", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ messages: [{ role: "user", content: text }] })
+    body: JSON.stringify({ userId: user.uid })
   });
 
   const data = await res.json();
 
-  removeTyping();
+  const nav = document.getElementById("sidenav");
+  nav.innerHTML = "<h3>Chats</h3>";
 
-  if (!auth.currentUser && !hasShownLoginGate) {
-
-    const partial = data.answer.split("\n").slice(0,2).join("\n");
-
-    addMessage("bot", partial);
-
-    hasShownLoginGate = true;
-    isLocked = true;
-
-    // 🔥 SHOW LOGIN + HIDE INPUT
-    document.getElementById("loginWall").style.display = "block";
-    document.getElementById("inputBox").classList.add("hidden");
-
-  } else {
-    addMessage("bot", data.answer);
-  }
+  data.chats.forEach(c => {
+    const div = document.createElement("div");
+    div.className = "chat-item";
+    div.innerText = c.date;
+    div.onclick = () => loadChat(c.chatId);
+    nav.appendChild(div);
+  });
 }
 
-// UI
-function addMessage(role, text) {
+// LOAD CHAT
+async function loadChat(chatId) {
+  const user = auth.currentUser;
+
+  currentChatId = chatId;
+
+  const res = await fetch(BASE + "/chat-history", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ userId: user.uid, chatId })
+  });
+
+  const data = await res.json();
+
+  const chat = document.getElementById("chat");
+  chat.innerHTML = "";
+
+  data.history.forEach(m => {
+    chat.innerHTML += `<div>${m.content[0].text}</div>`;
+  });
+}
+
+// CREATE CHAT
+async function createChat() {
+  const user = auth.currentUser;
+
+  const res = await fetch(BASE + "/new-chat", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ userId: user.uid })
+  });
+
+  const data = await res.json();
+  currentChatId = data.chatId;
+}
+
+// SEND
+async function send() {
+  const user = auth.currentUser;
+  const text = document.getElementById("input").value;
+
+  if (!currentChatId) await createChat();
+
+  const res = await fetch(BASE + "/chat", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      userId: user.uid,
+      chatId: currentChatId,
+      message: text
+    })
+  });
+
+  const data = await res.json();
+
   const chat = document.getElementById("chat");
 
-  const div = document.createElement("div");
-  div.className = "msg " + role;
-  div.innerText = text;
-
-  chat.appendChild(div);
-
-  setTimeout(() => {
-    chat.scrollTo({
-      top: chat.scrollHeight,
-      behavior: "smooth"
-    });
-  }, 50);
-}
-
-function addTyping() {
-  const chat = document.getElementById("chat");
-
-  const div = document.createElement("div");
-  div.id = "typing";
-  div.className = "msg bot";
-  div.innerText = "Krishna soch rahe hain...";
-
-  chat.appendChild(div);
-}
-
-function removeTyping() {
-  const t = document.getElementById("typing");
-  if (t) t.remove();
+  chat.innerHTML += `<div>${text}</div>`;
+  chat.innerHTML += `<div>${data.answer}</div>`;
 }
 
 </script>
